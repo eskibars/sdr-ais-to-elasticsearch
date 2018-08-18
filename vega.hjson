@@ -1,0 +1,100 @@
+{
+   "$schema": "https://vega.github.io/schema/vega/v3.0.json",
+   "config": {
+     "kibana": {
+       "type": "map",
+       "latitude": 37.77,
+       "longitude": -122.45,
+       "zoom": 12,
+       "mapStyle": "default",
+       "minZoom": 5,
+       "maxZoom": 17,
+       "zoomControl": true,
+       "delayRepaint": true,
+       "controlsDirection": "horizontal"
+     }
+   },
+   "data": [
+     {
+       "name": "ships",
+       "url": {
+         "index": "ships-*",
+         "body": {
+           "query": {
+            "bool": {
+              "must": [
+                { "exists": { "field": "location" } },
+                { "exists": { "field": "mmsi" } },
+                { "range": {"curtime": {"%timefilter%": true}} }
+              ]
+            }
+           },
+           "size": 10000
+         }
+       }
+       "format": { "type": "json", "property": "hits.hits" },
+       "transform": [
+          {
+            "type": "geopoint",
+            "projection": "projection",
+            "fields": [
+              {"expr": "datum._source.location.lon"},
+              {"expr": "datum._source.location.lat"}
+            ],
+            "as": ["x", "y"]
+          },
+          {
+            "type": "formula",
+            "expr": "if (datum._source.dim_a != null && datum._source.dim_b != null && datum._source.dim_c != null, log(1 + datum._source.dim_a + datum._source.dim_b + datum._source.dim_c) * 10, 100)"
+            "as": "shipsize"
+          },
+          {
+            "type": "formula",
+            "expr": "datum._source.mmsi % 20"
+            "as": "shipcolor"
+          },
+          {
+            type: "formula",
+            expr: "if (datum._source.name != null, datum._source.name, 'Unnamed')",
+            as: "shipname"
+          },
+          {
+            type: "formula",
+            expr: "if (datum._source.true_heading != null, datum._source.true_heading, 'Unnamed')",
+            as: "heading"
+          }
+       ],
+     },
+   ],
+   scales: [
+    {
+      "name": "shipcolorscale",
+      "type": "ordinal",
+      "domain": {"data": "ships", "field": "shipcolor"},
+      "range": { "scheme": "category20" }
+    }
+  ],
+    "marks": [
+      {
+          "type": "text",
+          "from": {"data": "ships"},
+          "encode": {
+            "update": {
+              "x": {"signal": "datum.x"},
+              "y": {"signal": "datum.y"},
+              "text": { "value": "⏏" },
+              "fontSize": { "signal": "datum.shipsize" },
+              "fill": { "scale": "shipcolorscale", "field": "shipcolor" },
+              "align": { "value": "center" },
+              "fontWeight": { "value": "bold" },
+              "angle": { "signal": "datum.heading" },
+              "tooltip": { "signal": "datum.shipname" },
+            }
+            "hover": {
+              "fill": {"value": "red"},
+              "tooltip": { "signal": "datum.shipname" }
+            }
+          }
+      }
+    ]
+}
